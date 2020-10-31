@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en-US">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Where do I move?</title>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2"></script>
+    <script>
+        // https://stackoverflow.com/a/2450976/1837080
+        function shuffle(array) {
+            var currentIndex = array.length,
+                temporaryValue, randomIndex;
+
+            // While there remain elements to shuffle...
+            while (0 !== currentIndex) {
+
+                // Pick a remaining element...
+                randomIndex = Math.floor(Math.random() * currentIndex);
+                currentIndex -= 1;
+
+                // And swap it with the current element.
+                temporaryValue = array[currentIndex];
+                array[currentIndex] = array[randomIndex];
+                array[randomIndex] = temporaryValue;
+            }
+
+            return array;
+        }
+    </script>
+</head>
+
+<body>
+    <h1>Where do I move?</h1>
+    <p>A no-nonsense guide to help you understand where you should move. For each pair, choose the one you would like to
+        have over the other.</p>
+    <div id="app">
+        <div v-if="!comparisonsActive">
+            <input v-model="newFactor" type="text" />
+            <button v-on:click="add">Add</button>
+            <button v-on:click="start">Start</button>
+            <ul>
+                <li v-for="factor in factors">
+                    <button v-on:click="remove(factor)">Remove</button> {{ factor }}
+                </li>
+            </ul>
+        </div>
+        <div v-if="comparisonsActive">
+            <button v-on:click="choose('BACK')">Back</button>
+            <div>
+                <button v-on:click="choose('A')">{{ comparisons[comparisonIndex].A }}</button>
+                <button v-on:click="choose('B')">{{ comparisons[comparisonIndex].B }}</button>
+            </div>
+            <span>{{ ((comparisonIndex/comparisons.length) * 100).toFixed(2) }}% complete</span>
+        </div>
+    </div>
+
+    <script>
+        const times = [
+            "<15 minutes from",
+            "30-45 minutes from",
+            "60-90 minutes from",
+            "2+ hours from"
+        ];
+
+        const timesFactors = [
+            "an ocean/sea",
+            "a lake",
+            "a river",
+            "a forest",
+            "the city",
+            "the highway",
+            "the airport",
+            "my child's school",
+            "school",
+            "restaurants",
+            "grocery stores",
+            "the hospital",
+            "healthcare facilities",
+            "convenience stores",
+            "shops",
+            "the movie theater",
+            "a sports stadium",
+            "a theater (play)",
+            "the nightlife",
+            "church",
+            "a gas station",
+            "farmland",
+            "mountains",
+            "friends",
+            "family",
+            "cousins",
+            "work"
+        ];
+
+        const nonTimesFactors = [
+
+            // Drinking water
+            "Prefer drinking lake water",
+            "Prefer drinking ocean water",
+            "Prefer drinking well water",
+            "Prefer drinking bottled/boiled water",
+
+            // Geography
+            "Prefer the suburbs",
+            "Prefer the city",
+
+            // Safety
+            "Prefer a less-safe area",
+            "Prefer a safe area",
+            "Prefer the safest area",
+
+            // Cost
+            "Low cost of living",
+            "Average cost of living",
+            "High cost of living",
+
+            // City
+            "Tiny city",
+            "Small city",
+            "Medium city",
+            "Large city",
+            "Very high-density city",
+
+            // Jobs
+            "No opportunity for jobs",
+            "Small opportunity for jobs",
+            "Large opportunity for jobs",
+
+            // Taxes
+            "Little to no taxes",
+            "Average taxes",
+            "High taxes",
+
+            // Commute
+            "Prefer to drive",
+            "Prefer to take buses",
+            "Prefer to take the train",
+            "Prefer to bike",
+            "Prefer to walk",
+
+            // Temperature
+            "Temperature tends colder",
+            "Temperature tends milder",
+            "Temperature tends warmer",
+            "Temperature tends hotest",
+
+            // Weather
+            "Chance of hurricanes",
+            "Chance of tornadoes",
+            "Chance of dust storms",
+            "Chance of flooding",
+            "Chance of wildfires",
+            "Chance of earthquakes",
+            "Chance of blizzards"
+        ];
+
+        let factors = nonTimesFactors;
+        for (let i = 0; i < timesFactors.length; i++) {
+            for (let j = 0; j < times.length; j++) {
+                factors.push(`${times[j]} ${timesFactors[i]}`);
+            }
+        }
+
+        let app = new Vue({
+            el: "#app",
+            data: {
+                newFactor: "",
+                factors,
+                comparisonsActive: false,
+                comparisons: [],
+                comparisonIndex: 0,
+                results: []
+            },
+            methods: {
+                add: function () {
+                    let existing = this.factors.indexOf(this.newFactor);
+
+                    if (existing < 0) {
+                        this.factors.push(this.newFactor);
+                        this.newFactor = "";
+                    }
+                },
+                remove: function (factor) {
+                    let index = this.factors.indexOf(factor);
+
+                    if (index >= 0) {
+                        this.factors.splice(index, 1);
+                    }
+                },
+                start: function () {
+                    // Build comparisons
+                    let temp = shuffle(this.factors);
+
+                    for (let i = 0; i < temp.length; i++) {
+                        for (let j = i + 1; j < temp.length; j++) {
+                            this.comparisons.push({
+                                "A": temp[i],
+                                "B": temp[j]
+                            });
+                        }
+                    }
+
+                    this.comparisonsActive = true;
+                    console.log(this.comparisons.length);
+                },
+                choose: function (choice) {
+
+                    if (choice === "A") {
+                        this.results.push(this.comparisons[this.comparisonIndex].A);
+                        this.comparisonIndex++;
+                    } else if (choice === "B") {
+                        this.results.push(this.comparisons[this.comparisonIndex].B);
+                        this.comparisonIndex++;
+                    } else if (choice === "BACK") {
+                        this.results.pop();
+                        this.comparisonIndex--;
+                    }
+                }
+            }
+        })
+    </script>
+</body>
+
+</html>
