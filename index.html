@@ -30,11 +30,6 @@
             return array;
         }
     </script>
-    <style>
-        li {
-            list-style: none;
-        }
-    </style>
 </head>
 
 <body>
@@ -51,7 +46,7 @@
                     <button v-if="comparisonsActive" v-on:click="reset"
                         class="button is-danger is-medium is-link mt-2">Reset</button>
                 </div>
-                <div v-if="!comparisonsActive">
+                <div v-if="!comparisonsActive && !showResults">
                     <h2 class="title is-2">My comparisons</h2>
                     <p>
                         Below, you will see a list of factors that may affect your decision to move to a certain place
@@ -69,14 +64,14 @@
                     <button v-on:click="defaultFactors" class="button is-primary">Set default factors</button>
                     <div class="content">
                         <ul>
-                            <li v-for="factor in factors">
+                            <li v-for="factor in factors" style="list-style: none;">
                                 <button v-on:click="remove(factor)" class="button is-danger">Remove</button>
                                 <span style="vertical-align: -moz-middle-with-baseline;">{{ factor }}</span>
                             </li>
                         </ul>
                     </div>
                 </div>
-                <div v-if="comparisonsActive">
+                <div v-if="comparisonsActive && !showResults">
                     <button v-on:click="choose('BACK')" class="button mb-4">Previous comparison</button>
                     <p>Choose the option you'd prefer <strong>more</strong>. Your progress is automatically saved
                         (provided you do not reset).</p>
@@ -88,6 +83,16 @@
                     </div>
                     <span class="mt-4">{{ ((comparisonIndex/comparisons.length) * 100).toFixed(2) }}% complete
                         ({{comparisonIndex + 1}}/{{comparisons.length}})</span>
+                </div>
+                <div v-if="showResults">
+                    <p>Based on your answers, these are the factors that you rank by highest priority:</p>
+                    <div class="content">
+                        <ul>
+                            <li v-for="result in results">
+                                {{ result }}
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         </div>
@@ -218,7 +223,9 @@
                 comparisonsActive: false,
                 comparisons: [],
                 comparisonIndex: 0,
-                results: []
+                workingResults: [],
+                results: [],
+                showResults: false
             },
             methods: {
                 add: function () {
@@ -241,6 +248,7 @@
                     let temp = JSON.parse(JSON.stringify(this.factors));
                     temp = shuffle(temp);
 
+                    // Build comparisons
                     for (let i = 0; i < temp.length; i++) {
                         for (let j = i + 1; j < temp.length; j++) {
                             this.comparisons.push({
@@ -250,13 +258,38 @@
                         }
                     }
 
+                    // save to localstorage
+                    localStorage.setItem("comparisons", JSON.stringify(this.comparisons));
+                    localStorage.setItem("comparisonIndex", 0);
+
                     this.comparisonsActive = true;
-                    console.log(this.comparisons.length);
+                    this.showResults = false;
                 },
                 reset: function () {
-                    this.comparisons = [];
-                    this.comparisonIndex = 0;
-                    this.comparisonsActive = false;
+                    Swal.fire({
+                        title: "Are you sure?",
+                        text: "You will lose all existing progress; this is not recoverable.",
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#3298dc",
+                        cancelButtonColor: "#f14668",
+                        confirmButtonText: "I want to start all over"
+                    }).then((result) => {
+
+                        if (result.isConfirmed) {
+                            this.comparisons = [];
+                            this.comparisonIndex = 0;
+                            this.comparisonsActive = false;
+                            this.workingResults = [];
+                            this.results = [];
+                            this.showResults = false;
+
+                            localStorage.removeItem("comparisons");
+                            localStorage.removeItem("comparisonIndex", 0);
+                            localStorage.removeItem("workingResults");
+                            localStorage.removeItem("results");
+                        }
+                    });
                 },
                 defaultFactors: function () {
                     this.factors = []; // reset
@@ -273,18 +306,101 @@
                 choose: function (choice) {
 
                     if (choice === "A") {
-                        this.results.push(this.comparisons[this.comparisonIndex].A);
+                        this.workingResults.push(this.comparisons[this.comparisonIndex].A);
                         this.comparisonIndex++;
                     } else if (choice === "B") {
-                        this.results.push(this.comparisons[this.comparisonIndex].B);
+                        this.workingResults.push(this.comparisons[this.comparisonIndex].B);
                         this.comparisonIndex++;
                     } else if (choice === "BACK") {
-                        this.results.pop();
+                        this.workingResults.pop();
                         this.comparisonIndex--;
                     }
+
+                    if (this.comparisonIndex >= this.comparisons.length) {
+
+                        // Calculate results
+                        let temp = {};
+                        for (let i = 0; i < this.workingResults.length; i++) {
+
+                            // Tally-up all results
+                            if (temp.hasOwnProperty(this.workingResults[i])) {
+                                temp[this.workingResults[i]] += 1;
+                            } else {
+                                temp[this.workingResults[i]] = 1;
+                            }
+                        }
+
+                        // Sort by largest (ie. preferred) first
+                        let keys = Object.keys(temp);
+                        keys.sort(function (a, b) {
+                            return temp[b] - temp[a];
+                        });
+
+                        // Add in count
+                        let results = keys;
+                        for (let i = 0; i < results.length; i++) {
+                            results[i] += ` (chosen ${temp[this.results[i]]} times)`;
+                        }
+
+                        this.results = results;
+                        this.showResults = true;
+
+                        localStorage.setItem("results", this.results);
+                    }
+
+                    localStorage.setItem("workingResults", JSON.stringify(this.workingResults));
+                    localStorage.setItem("comparisonIndex", this.comparisonIndex);
                 }
             }
-        })
+        });
+
+
+        // Load saved data if it exists in localstorage
+        let workingResults = localStorage.getItem("workingResults");
+        let comparisons = localStorage.getItem("comparisons");
+        let comparisonIndex = localStorage.getItem("comparisonIndex");
+        let results = localStorage.getItem("results");
+
+        if (results !== null) {
+
+            results = JSON.parse(results);
+            if (results.length > 0) {
+                app.results = results;
+                app.showResults = true;
+
+                console.log("Loaded results from localstorage");
+            } else {
+                console.warn("Found results but could not parse and load them on page load");
+            }
+        } else if (comparisons !== null &&
+            comparisonIndex !== null) {
+
+            comparisons = JSON.parse(comparisons);
+            comparisonIndex = parseInt(comparisonIndex, 10);
+
+            if (comparisons.length > 0 && comparisonIndex >= 0) {
+                app.comparisons = comparisons;
+                app.comparisonIndex = comparisonIndex;
+                app.comparisonsActive = true;
+
+                if (workingResults !== null) {
+                    workingResults = JSON.parse(workingResults);
+
+                    app.workingResults = workingResults;
+
+                    console.log("Loaded existing progress from localstorage");
+                } else {
+                    // Start over if we can't re-load working results
+                    app.comparisonIndex = 0;
+
+                    console.warn("Could not find existing progress from localstorage");
+                }
+            } else {
+                console.warn("Could not find any comparisons to load");
+            }
+        } else {
+            console.log("Nothing found in localstorage");
+        }
     </script>
 </body>
 
